@@ -104,6 +104,11 @@ inline const char* GetForegroundWindowName() {
     return WindowTitleCString;
 }
 
+void DelayedStartReplayBuffer(int miliseconds) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(miliseconds));
+    StartReplayBuffer();
+}
+
 // Handles when the replay buffer is completely stopped, or if it is saved.
 void EventHandler(obs_frontend_event event, void *private_data) {
     if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
@@ -113,10 +118,9 @@ void EventHandler(obs_frontend_event event, void *private_data) {
         if (CurrentlySaving) {
             CurrentlySaving = false;
 
-            // This is awful. Truly awful. I'm not good enough to figure out a better way right now.
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::thread DelayedStartReplayBufferThread(DelayedStartReplayBuffer, 1000);
 
-            StartReplayBuffer();
+            DelayedStartReplayBufferThread.join();
         }
     }
 
