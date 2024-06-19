@@ -21,4 +21,6 @@ void CaptureEvent(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool press
 
 void AttemptCaptureReplay();
 
+inline const char* GetForegroundWindowName();
+
 #endif

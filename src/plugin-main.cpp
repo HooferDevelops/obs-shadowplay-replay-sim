@@ -18,8 +18,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <chrono>
 #include <thread>
+#include <filesystem>
+#include <string>
+#include <windows.h>
+#include <comdef.h>
+#include <Psapi.h>
 
 #include "plugin-main.h"
+
+namespace fs = std::filesystem;
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -72,6 +79,31 @@ void CaptureEvent(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool press
     }
 }
 
+// Gets the current active process being selected by windows.
+inline const char* GetForegroundWindowName() {
+    DWORD ProcessID = 0;
+
+    HWND ForegroundWindow = GetForegroundWindow();
+    GetWindowThreadProcessId(ForegroundWindow, &ProcessID);
+
+    HANDLE ProcessHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, ProcessID);
+
+    if (ProcessHandle == NULL) {
+        obs_log(LOG_ERROR, "Failed to get process handle");
+        return "Desktop";
+    }
+
+    TCHAR ProcessName[MAX_PATH];
+    DWORD Size = MAX_PATH;
+
+    QueryFullProcessImageName(ProcessHandle, 0, ProcessName, &Size);
+
+    _bstr_t b(ProcessName);
+    const char* WindowTitleCString = b;
+
+    return WindowTitleCString;
+}
+
 // Handles when the replay buffer is completely stopped, or if it is saved.
 void EventHandler(obs_frontend_event event, void *private_data) {
     if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
@@ -108,7 +140,23 @@ void EventHandler(obs_frontend_event event, void *private_data) {
 
             // TODO: Do something with the replay file.
             obs_log(LOG_INFO, ReplayPath);
+            obs_log(LOG_INFO, GetForegroundWindowName());
             obs_log(LOG_INFO, "Output Data Processed");
+
+            fs::path CurrentWindowPath = GetForegroundWindowName();
+
+            fs::path ReplayFilePath = ReplayPath;
+
+            // If a folder for the current window does not exist, create it.
+            fs::path WindowFolder = ReplayFilePath.parent_path() / CurrentWindowPath.stem();
+
+            if (!fs::exists(WindowFolder)) {
+                fs::create_directory(WindowFolder);
+            }
+
+            // Move the replay file to the window folder.
+            fs::path NewReplayPath = WindowFolder / ReplayFilePath.filename();
+            fs::rename(ReplayFilePath, NewReplayPath);
 
             // We're done with the replay, so we can "restart" the buffer by force stopping it.
             StopReplayBuffer();
