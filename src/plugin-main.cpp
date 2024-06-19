@@ -142,9 +142,6 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             calldata_destroy(CallData);
             obs_output_release(BufferOutput);
 
-            // TODO: Do something with the replay file.
-            obs_log(LOG_INFO, ReplayPath);
-            obs_log(LOG_INFO, GetForegroundWindowName());
             obs_log(LOG_INFO, "Output Data Processed");
 
             fs::path ReplayFilePath = ReplayPath;
