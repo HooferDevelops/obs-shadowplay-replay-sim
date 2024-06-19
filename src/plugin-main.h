@@ -10,6 +10,22 @@ obs_hotkey_id CaptureReplayHotkey;
 bool CurrentlySaving = false;
 std::string LastForegroundWindowName = "Desktop";
 
+std::map<std::string, std::string> ForegroundWindowAlts = {
+    {"explorer", "Desktop"},
+    {"javaw", "Java Application"},
+    {"RobloxPlayerBeta", "Roblox"},
+    {"RobloxPlayer", "Roblox"},
+    {"RobloxStudioBeta", "Roblox Studio"},
+    {"RobloxStudio", "Roblox Studio"},
+    {"steam", "Steam"},
+    {"obs64", "OBS"},
+    {"librewolf", "Librewolf"},
+    {"GithubDesktop", "GitHub Desktop"},
+    {"chrome", "Google Chrome"},
+    {"Code", "Visual Studio Code"},
+    {"parsecd", "Parsec"}
+};
+
 void DelayedStartReplayBuffer(int miliseconds);
 void StartReplayBuffer();
 void StopReplayBuffer();

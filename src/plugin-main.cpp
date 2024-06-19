@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <thread>
 #include <filesystem>
 #include <string>
+#include <map>
 #include <windows.h>
 
 #include <comdef.h>
@@ -157,7 +158,7 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             fs::path NewReplayPath = WindowFolder / ReplayFilePath.filename();
             fs::rename(ReplayFilePath, NewReplayPath);
 
-            SendToastPowerShell(LastForegroundWindowName.c_str());
+            SendToastPowerShell(("Successfully captured a replay for " + LastForegroundWindowName).c_str());
 
             // We're done with the replay, so we can "restart" the buffer by force stopping it.
             StopReplayBuffer();
@@ -186,7 +187,7 @@ void SendToastPowerShell(const char* Message) {
     MessageString = ReplaceAll(MessageString, "\"", "\\\"");
     
     std::string Command = "-WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
-                          "$notificationTitle = 'Successfully captured a replay for ";
+                          "$notificationTitle = '";
     Command +=             MessageString;
     Command +=             "';"
                           "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
@@ -199,7 +200,7 @@ void SendToastPowerShell(const char* Message) {
                           "$toast.Tag = 'Replay';"
                           "$toast.Group = 'Replay';"
                           "$toast.ExpirationTime = [DateTimeOffset]::Now.AddSeconds(15);"
-                          "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Replay Captured');"
+                          "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OBS');"
                           "$notifier.Show($toast);";
 
     ShellExecuteA(NULL, "open", "powershell.exe", Command.c_str(), "", SW_HIDE);
@@ -217,7 +218,20 @@ void AttemptCaptureReplay() {
 
     LastForegroundWindowName = CurrentWindowPath.stem().string();
 
+    // Check if we have an alternative name for the window.
+    if (ForegroundWindowAlts[LastForegroundWindowName] != "") {
+        LastForegroundWindowName = ForegroundWindowAlts[LastForegroundWindowName];
+    }
+
     obs_log(LOG_INFO, "Capturing Replay");
+
+    if (!obs_frontend_replay_buffer_active()) {
+        CurrentlySaving = false;
+
+        SendToastPowerShell("Failed to capture replay because the replay buffer is not active.");
+
+        return;
+    }
 
     obs_frontend_replay_buffer_save();
 }
