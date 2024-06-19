@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <filesystem>
 #include <string>
 #include <windows.h>
+
 #include <comdef.h>
 
 #include "plugin-main.h"
@@ -157,6 +158,8 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             fs::path NewReplayPath = WindowFolder / ReplayFilePath.filename();
             fs::rename(ReplayFilePath, NewReplayPath);
 
+            SendToastPowerShell(CurrentWindowPath.stem().string().c_str());
+
             // We're done with the replay, so we can "restart" the buffer by force stopping it.
             StopReplayBuffer();
         }
@@ -166,6 +169,41 @@ void EventHandler(obs_frontend_event event, void *private_data) {
         obs_log(LOG_INFO, "Resetting Saving State");
         CurrentlySaving = false;
     }
+}
+
+// https://stackoverflow.com/questions/2896600/how-to-replace-all-occurrences-of-a-character-in-string
+std::string ReplaceAll(std::string str, const std::string& from, const std::string& to) {
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+    }
+    return str;
+}
+
+void SendToastPowerShell(const char* Message) {
+    std::string MessageString = Message;
+    MessageString = ReplaceAll(MessageString, "\"", "\\\"");
+    
+    std::string Command = "powershell -WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
+                          "$notificationTitle = 'Successfully captured a replay for ";
+    Command +=             MessageString;
+    Command +=             "';"
+                          "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
+                          "$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText01);"
+                          "$toastXml = [xml] $template.GetXml();"
+                          "$toastXml.GetElementsByTagName('text').AppendChild($toastXml.CreateTextNode($notificationTitle)) > $null;"
+                         "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument;"
+                          "$xml.LoadXml($toastXml.OuterXml);"
+                          "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml);"
+                          "$toast.Tag = 'Replay';"
+                          "$toast.Group = 'Replay';"
+                          "$toast.ExpirationTime = [DateTimeOffset]::Now.AddSeconds(15);"
+                          "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Replay Captured');"
+                          "$notifier.Show($toast);";
+
+    obs_log(LOG_INFO, Command.c_str());
+    system(Command.c_str());
 }
 
 // This function is called when the hotkey is pressed.

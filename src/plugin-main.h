@@ -21,6 +21,8 @@ void CaptureEvent(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool press
 
 void AttemptCaptureReplay();
 
+void SendToastPowerShell(const char* message);
+
 inline const char* GetForegroundWindowName();
 
 #endif
