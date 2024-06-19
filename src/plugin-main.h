@@ -8,6 +8,7 @@
 obs_hotkey_id CaptureReplayHotkey;
 
 bool CurrentlySaving = false;
+std::string LastForegroundWindowName = "Desktop";
 
 void StartReplayBuffer();
 void StopReplayBuffer();

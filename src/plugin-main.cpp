@@ -143,12 +143,10 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             obs_log(LOG_INFO, GetForegroundWindowName());
             obs_log(LOG_INFO, "Output Data Processed");
 
-            fs::path CurrentWindowPath = GetForegroundWindowName();
-
             fs::path ReplayFilePath = ReplayPath;
 
             // If a folder for the current window does not exist, create it.
-            fs::path WindowFolder = ReplayFilePath.parent_path() / CurrentWindowPath.stem();
+            fs::path WindowFolder = ReplayFilePath.parent_path() / LastForegroundWindowName;
 
             if (!fs::exists(WindowFolder)) {
                 fs::create_directory(WindowFolder);
@@ -158,7 +156,7 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             fs::path NewReplayPath = WindowFolder / ReplayFilePath.filename();
             fs::rename(ReplayFilePath, NewReplayPath);
 
-            SendToastPowerShell(CurrentWindowPath.stem().string().c_str());
+            SendToastPowerShell(LastForegroundWindowName.c_str());
 
             // We're done with the replay, so we can "restart" the buffer by force stopping it.
             StopReplayBuffer();
@@ -181,11 +179,12 @@ std::string ReplaceAll(std::string str, const std::string& from, const std::stri
     return str;
 }
 
+// Sends a toast notification to Windows using PowerShell. This is a bit of a hack, but it works.
 void SendToastPowerShell(const char* Message) {
     std::string MessageString = Message;
     MessageString = ReplaceAll(MessageString, "\"", "\\\"");
     
-    std::string Command = "powershell -WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
+    std::string Command = "-WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
                           "$notificationTitle = 'Successfully captured a replay for ";
     Command +=             MessageString;
     Command +=             "';"
@@ -202,8 +201,7 @@ void SendToastPowerShell(const char* Message) {
                           "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Replay Captured');"
                           "$notifier.Show($toast);";
 
-    obs_log(LOG_INFO, Command.c_str());
-    system(Command.c_str());
+    ShellExecuteA(NULL, "open", "powershell.exe", Command.c_str(), "", SW_HIDE);
 }
 
 // This function is called when the hotkey is pressed.
@@ -213,6 +211,10 @@ void AttemptCaptureReplay() {
     }
 
     CurrentlySaving = true;
+
+    fs::path CurrentWindowPath = GetForegroundWindowName();
+
+    LastForegroundWindowName = CurrentWindowPath.stem().string();
 
     obs_log(LOG_INFO, "Capturing Replay");
 
