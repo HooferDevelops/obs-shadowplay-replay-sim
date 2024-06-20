@@ -10,6 +10,7 @@ obs_hotkey_id CaptureReplayHotkey;
 bool CurrentlySaving = false;
 std::string LastForegroundWindowName = "Desktop";
 
+// One day it would be very nice to have this as a configuration file.
 std::map<std::string, std::string> ForegroundWindowAlts = {
     {"explorer", "Desktop"},
     {"javaw", "Java Application"},
@@ -39,7 +40,7 @@ void CaptureEvent(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey, bool press
 
 void AttemptCaptureReplay();
 
-void SendToastPowerShell(const char* message);
+void SendToastPowerShell(const char* Message, const char* ReplayPath);
 
 inline const char* GetForegroundWindowName();
 

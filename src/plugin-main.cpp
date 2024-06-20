@@ -158,7 +158,7 @@ void EventHandler(obs_frontend_event event, void *private_data) {
             fs::path NewReplayPath = WindowFolder / ReplayFilePath.filename();
             fs::rename(ReplayFilePath, NewReplayPath);
 
-            SendToastPowerShell(("Successfully captured a replay for " + LastForegroundWindowName).c_str());
+            SendToastPowerShell(("Successfully captured a replay for " + LastForegroundWindowName).c_str(), NewReplayPath.string().c_str());
 
             // We're done with the replay, so we can "restart" the buffer by force stopping it.
             StopReplayBuffer();
@@ -182,19 +182,30 @@ std::string ReplaceAll(std::string str, const std::string& from, const std::stri
 }
 
 // Sends a toast notification to Windows using PowerShell. This is a bit of a hack, but it works.
-void SendToastPowerShell(const char* Message) {
+void SendToastPowerShell(const char* Message, const char* ReplayPath) {
     std::string MessageString = Message;
     MessageString = ReplaceAll(MessageString, "\"", "\\\"");
-    
-    std::string Command = "-WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
-                          "$notificationTitle = '";
-    Command +=             MessageString;
-    Command +=             "';"
+
+    std::string ReplayPathString = ReplayPath;
+    ReplayPathString = ReplaceAll(ReplayPathString, "\"", "\\\"");
+
+    std::string Command = "$notificationTitle = '" + MessageString + "';"
                           "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
                           "$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText01);"
                           "$toastXml = [xml] $template.GetXml();"
                           "$toastXml.GetElementsByTagName('text').AppendChild($toastXml.CreateTextNode($notificationTitle)) > $null;"
-                         "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument;"
+                          "$actions = $toastXml.CreateElement('actions');"
+                          "$action = $toastXml.CreateElement('action');";
+
+        if (ReplayPath != "") {
+            Command +=    "$action.SetAttribute('content', 'View Replay');"
+                          "$action.SetAttribute('activationType', 'protocol');"
+                          "$action.SetAttribute('arguments', '" + ReplayPathString + "');"
+                          "$actions.AppendChild($action) > $null;";
+        }
+
+        Command +=        "$toastXml.DocumentElement.AppendChild($actions) > $null;"
+                          "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument;"
                           "$xml.LoadXml($toastXml.OuterXml);"
                           "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml);"
                           "$toast.Tag = 'Replay';"
@@ -202,6 +213,23 @@ void SendToastPowerShell(const char* Message) {
                           "$toast.ExpirationTime = [DateTimeOffset]::Now.AddSeconds(15);"
                           "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OBS');"
                           "$notifier.Show($toast);";
+    
+    // std::string Command = "-WindowStyle Hidden -ExecutionPolicy Bypass $ErrorActionPreference = 'Stop';"
+    //                       "$notificationTitle = '";
+    // Command +=             MessageString;
+    // Command +=             "';"
+    //                       "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
+    //                       "$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText01);"
+    //                       "$toastXml = [xml] $template.GetXml();"
+    //                       "$toastXml.GetElementsByTagName('text').AppendChild($toastXml.CreateTextNode($notificationTitle)) > $null;"
+    //                      "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument;"
+    //                       "$xml.LoadXml($toastXml.OuterXml);"
+    //                       "$toast = [Windows.UI.Notifications.ToastNotification]::new($xml);"
+    //                       "$toast.Tag = 'Replay';"
+    //                       "$toast.Group = 'Replay';"
+    //                       "$toast.ExpirationTime = [DateTimeOffset]::Now.AddSeconds(15);"
+    //                       "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OBS');"
+    //                       "$notifier.Show($toast);";
 
     ShellExecuteA(NULL, "open", "powershell.exe", Command.c_str(), "", SW_HIDE);
 }
@@ -228,7 +256,7 @@ void AttemptCaptureReplay() {
     if (!obs_frontend_replay_buffer_active()) {
         CurrentlySaving = false;
 
-        SendToastPowerShell("Failed to capture replay because the replay buffer is not active.");
+        SendToastPowerShell("Failed to capture replay because the replay buffer is not active.", "");
 
         return;
     }
